@@ -1,0 +1,10 @@
+{
+  "editor.formatOnSave": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+  "python.analysis.autoImportCompletions": true
+}

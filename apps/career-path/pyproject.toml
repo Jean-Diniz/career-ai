@@ -1,0 +1,28 @@
+[project]
+name = "career-path"
+version = "0.1.0"
+description = "Agente 2 (Trilhas e Avaliação)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.9",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+exclude = ["venv", ".venv", "build", "dist"]
+fix = true
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]  # E: pycodestyle, F: pyflakes, I: isort
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "lf"
