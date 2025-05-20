@@ -95,23 +95,23 @@
 
 ### 5.1 Estrutura Base
 
-- [ ] Configurar projeto Next.js
+- [x] Configurar projeto Next.js
 - [ ] Implementar tema e estilos
 - [ ] Configurar shadcn-ui
 - [ ] Estabelecer padrões de componentes
 
 ### 5.2 Páginas Principais
 
-- [ ] Página de Cadastro
-  - [ ] Formulário de LinkedIn
+- [] Página de Cadastro
+  - [x] Formulário de LinkedIn
   - [ ] Validações
   - [ ] Feedback visual
 - [ ] Interface de Chat
-  - [ ] Componente de chat
+  - [x] Componente de chat
   - [ ] Sistema de mensagens
   - [ ] Indicadores de status
 - [ ] Dashboard
-  - [ ] Visualização de perfil
+  - [x] Visualização de perfil
   - [ ] Progresso da trilha
   - [ ] Configurações
 
