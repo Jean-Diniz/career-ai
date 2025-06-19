@@ -14,3 +14,4 @@ class UserCreate(BaseModel):
     email: str | None = None
     full_name: str | None = None
     password: str
+    linkedin_url: str

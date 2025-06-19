@@ -10,3 +10,4 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=True)
     hashed_password = Column(String, nullable=False)
     disabled = Column(Boolean, default=False, nullable=False)
+    linkedin_url = Column(String, nullable=False)

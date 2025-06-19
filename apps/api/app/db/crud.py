@@ -30,6 +30,7 @@ def create_user(db: Session, user_in: UserCreate) -> UserInDB:
         full_name=user_in.full_name,
         hashed_password=hashed,
         disabled=False,
+        linkedin_url=user_in.linkedin_url
     )
     db.add(db_user)
     db.commit()
