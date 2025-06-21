@@ -11,3 +11,10 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     disabled = Column(Boolean, default=False, nullable=False)
     linkedin_url = Column(String, nullable=False)
+
+class Diagnostic(Base):
+    __tablename__ = "diagnostics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    diagnostic = Column(String, nullable=False)
+    linkedin_url = Column(String, nullable=False)

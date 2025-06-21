@@ -4,10 +4,16 @@
 docker build -t ollama-image:dev .
 ```
 
+## Criação da rede
+
+```bash
+docker network create my-net
+```
+
 ## Execução do Container
 
 ```bash
-docker run --rm -p 11434:11434 --name ollama-server ollama-image:dev
+docker run --rm -p 11434:11434 --network my-net --name ollama-server ollama-image:dev
 ```
 
 ## Verificando o Serviço
