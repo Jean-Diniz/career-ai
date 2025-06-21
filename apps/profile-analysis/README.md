@@ -1,69 +1,27 @@
-# Career AI - Análise de Perfil
-
-Este é o módulo de análise de perfil do Career AI, responsável por processar e analisar perfis profissionais dos usuários.
-
-## Requisitos
-
-- Python 3.12 ou superior
-- [uv](https://github.com/astral-sh/uv) (gerenciador de pacotes Python)
-
-## Configuração
-
-1. Crie e ative um ambiente virtual:
+## Construção da Imagem
 
 ```bash
-# Usando virtualenv
-uv venv
-source .venv/bin/activate  # Linux/Mac
-# ou
-.\.venv\Scripts\activate  # Windows
+docker build -t ollama-image:dev .
 ```
 
-2. Instale as dependências:
+## Execução do Container
 
 ```bash
-uv sync
+docker run --rm -p 11434:11434 --name ollama-server ollama-image:dev
 ```
 
-3. Configure as variáveis de ambiente:
-   - Copie o arquivo `.env.example` para `.env`
-   - Preencha as variáveis necessárias, incluindo:
-     - Chaves de API para serviços de IA
-     - Configurações de banco de dados
-     - Credenciais de serviços externos
-
-## Desenvolvimento
-
-Para iniciar o servidor de desenvolvimento:
+## Verificando o Serviço
 
 ```bash
-uv run -m app.main
+curl -X POST http://localhost:11434/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+        "model": "llama3.2",
+        "prompt": "Olá, como você está hoje?",
+        "parameters": {
+          "max_tokens": 128,
+          "temperature": 0.7
+        },
+        "stream": false
+      }'
 ```
-
-## Estrutura do Projeto
-
-- `src/` - Código fonte principal
-  - `analyzers/` - Analisadores de perfil
-  - `models/` - Modelos de IA
-  - `services/` - Serviços de processamento
-  - `utils/` - Utilitários
-- `tests/` - Testes automatizados
-- `data/` - Dados de treinamento e modelos
-- `scripts/` - Scripts de automação
-
-## Scripts Disponíveis
-
-- `ruff format .` - Formata o código
-- `ruff check .` - Executa o linter
-
-## Contribuição
-
-1. Faça um fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
-4. Push para a branch (`git push origin feature/nova-feature`)
-5. Abra um Pull Request
-
-## Documentação da API
-
-A documentação completa da API está disponível em `/docs` quando o servidor estiver rodando.
