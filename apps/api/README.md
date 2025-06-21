@@ -1,5 +1,7 @@
 # README
 
+Alunos: Alisson Grilo, Jean Santos, Leandro Castro e Samuel Santos.
+
 Guia rápido para Docker + FastAPI/Uvicorn em modo dev com hot-reload e instalação dinâmica de pacotes.
 
 ---
