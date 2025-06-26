@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.db.models import User as UserTable
 from app.schemas.user import UserCreate, UserInDB
 from app.schemas.token import TokenData
+from app.db.models import Diagnostic as DiagnosticTable
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -21,6 +22,16 @@ def get_user(db: Session, username: str) -> UserInDB | None:
         return None
     return UserInDB(**db_user.__dict__)
 
+def create_diagnostic(db: Session, diagnostic: str, linkedin_url: str):
+    db_diagnostic = DiagnosticTable(
+        diagnostic=diagnostic,
+        linkedin_url=linkedin_url
+    )
+    db.add(db_diagnostic)
+    db.commit()
+    db.refresh(db_diagnostic)
+
+    return { diagnostic: diagnostic, linkedin_url: linkedin_url}
 
 def create_user(db: Session, user_in: UserCreate) -> UserInDB:
     hashed = get_password_hash(user_in.password)

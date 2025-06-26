@@ -15,7 +15,7 @@ docker build -t fastapi-image:dev .
 ## Execução com hot-reload
 
 ```bash
-docker run --rm --name fastapi-container \
+docker run --rm --network my-net --name fastapi-container \
   -p 8000:80 \
   -v "$(pwd)":/code \
   fastapi-image:dev \

@@ -7,5 +7,8 @@ class Settings(BaseSettings):
     algorithm: str
     access_token_expire_minutes: int
     database_url: str
+    ollama_model: str
+    ollama_address: str
+    ollama_timeout: str
 
 settings = Settings()
