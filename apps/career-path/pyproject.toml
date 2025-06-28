@@ -1,10 +1,18 @@
 [project]
 name = "career-path"
 version = "0.1.0"
-description = "Agente 2 (Trilhas e Avaliação)"
+description = "Servidor A2A para trilhas de carreira e estudos"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "langchain>=0.3.26",
+    "langchain-google-genai>=2.1.5",
+    "langchain-ollama>=0.3.3",
+    "langgraph>=0.5.0",
+    "python-a2a>=0.5.9",
+    "python-dotenv>=1.1.1",
+    "requests>=2.32.4",
+]
 
 [dependency-groups]
 dev = [
