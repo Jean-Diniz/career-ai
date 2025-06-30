@@ -1,13 +1,8 @@
 FROM ollama/ollama:latest
 
-RUN ollama serve & \
-    sleep 10 && \
-    ollama pull llama3.2 && \
-    pkill ollama
+COPY init.sh /init.sh
+RUN chmod +x /init.sh
 
 EXPOSE 11434
 
-ENTRYPOINT ["sh", "-c", "\
-  ollama serve & \
-  echo 'Ollama ready.' && wait \
-"]
+ENTRYPOINT ["/init.sh"]
