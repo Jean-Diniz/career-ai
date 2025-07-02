@@ -1,0 +1,25 @@
+{
+  "python.analysis.autoImportCompletions": true,
+  "python.defaultInterpreterPath": "./venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  "python.linting.enabled": true,
+  "python.linting.ruffEnabled": true,
+  "python.linting.ruffPath": "uv",
+  "python.linting.ruffArgs": ["run", "ruff", "check"],
+  "python.formatting.provider": "ruff",
+  "python.formatting.ruffPath": "uv",
+  "python.formatting.ruffArgs": ["run", "ruff", "format"],
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit",
+    "source.fixAll": "explicit"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit",
+      "source.fixAll": "explicit"
+    }
+  }
+}
