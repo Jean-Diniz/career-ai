@@ -1,0 +1,90 @@
+version: "3.8"
+
+services:
+  # API FastAPI
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - career-path
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/career_db
+      - SECRET_KEY=your-secret-key-here
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - OLLAMA_MODEL=llama3.1
+      - OLLAMA_ADDRESS=http://ollama:11434
+      - OLLAMA_TIMEOUT=60
+    networks:
+      - career-network
+    volumes:
+      - ./apps/api:/app
+
+  # Agente Career Path
+  career-path:
+    build:
+      context: ./apps/career-path
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - DEFAULT_LLM_PROVIDER=ollama
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama3.1
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+    networks:
+      - career-network
+    depends_on:
+      - ollama
+
+  # Interface UI (Next.js)
+  ui:
+    build:
+      context: ./apps/ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    networks:
+      - career-network
+    depends_on:
+      - api
+
+  # Banco de dados PostgreSQL
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=career_db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - career-network
+
+  # Ollama para LLM
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - career-network
+    command:
+      ["sh", "-c", "ollama serve & sleep 10 && ollama pull llama3.1 && wait"]
+
+networks:
+  career-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  ollama_data:

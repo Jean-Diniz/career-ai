@@ -11,7 +11,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
-from langgraph.graph.graph import CompiledGraph
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
 
 from app.models import PerfilPessoa
@@ -30,7 +30,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1")
 
 def create_career_agent(
     ollama_base_url: Optional[str] = None, ollama_model: Optional[str] = None
-) -> Optional[CompiledGraph]:
+) -> Optional[CompiledStateGraph]:
     """
     Cria um agente de carreira usando Ollama ou Google GenAI.
 
@@ -64,7 +64,7 @@ def create_career_agent(
         return None
 
 
-async def run_career_agent(agent: CompiledGraph, prompt: str) -> str:
+async def run_career_agent(agent: CompiledStateGraph, prompt: str) -> str:
     """
     Executa o agente de carreira com um prompt.
 
@@ -181,7 +181,7 @@ Formate a resposta como um JSON estruturado seguindo o modelo de TrilhaEstudos.
 
 
 async def gerar_trilha_ia(
-    perfil: PerfilPessoa, agent: Optional[CompiledGraph] = None
+    perfil: PerfilPessoa, agent: Optional[CompiledStateGraph] = None
 ) -> str:
     """
     Gera uma trilha de estudos usando IA baseada no perfil.
@@ -214,7 +214,7 @@ async def gerar_trilha_ia(
 
 
 async def analisar_perfil_ia(
-    perfil: PerfilPessoa, agent: Optional[CompiledGraph] = None
+    perfil: PerfilPessoa, agent: Optional[CompiledStateGraph] = None
 ) -> str:
     """
     Analisa um perfil profissional usando IA.
@@ -263,7 +263,7 @@ async def sugerir_recursos_ia(
     area: str,
     nivel: str = "intermediário",
     tipo: str = "todos",
-    agent: Optional[CompiledGraph] = None,
+    agent: Optional[CompiledStateGraph] = None,
 ) -> str:
     """
     Sugere recursos de estudo usando IA.
