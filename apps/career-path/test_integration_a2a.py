@@ -225,9 +225,13 @@ Se a mensagem menciona score, avaliação, pontuação de carreira, ou perguntas
 
                 mensagem = f"calcular score área: {area} experiência: {experiencia}"
 
-                response_message = await self.client_auxiliar.send_message_async(
-                    mensagem
+                # Criar um objeto Message em vez de passar uma string diretamente
+                message_obj = Message(
+                    content=TextContent(text=mensagem),
+                    role=MessageRole.USER
                 )
+                
+                response_message = await self.client_auxiliar.send_message_async(message_obj)
                 return response_message.content.text
 
         except Exception as e:
@@ -325,16 +329,30 @@ async def teste_comunicacao():
 
         # Testa mensagem que deve chamar o agente auxiliar
         logger.info("📤 Testando mensagem que requer agente auxiliar...")
-        response = await client.send_message_async(
-            "Qual o score de carreira para tecnologia com experiência intermediário?"
+        
+        # Criar um objeto Message em vez de passar uma string diretamente
+        message_obj = Message(
+            content=TextContent(
+                text="Qual o score de carreira para tecnologia com experiência intermediário?"
+            ),
+            role=MessageRole.USER
         )
+        
+        response = await client.send_message_async(message_obj)
 
         logger.info("📥 Resposta recebida:")
         logger.info(response.content.text)
 
         # Testa mensagem simples
         logger.info("📤 Testando mensagem simples...")
-        response2 = await client.send_message_async("Olá, como você pode me ajudar?")
+        
+        # Criar outro objeto Message para a segunda mensagem
+        message_obj2 = Message(
+            content=TextContent(text="Olá, como você pode me ajudar?"),
+            role=MessageRole.USER
+        )
+        
+        response2 = await client.send_message_async(message_obj2)
 
         logger.info("📥 Resposta recebida:")
         logger.info(response2.content.text)
