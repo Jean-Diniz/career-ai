@@ -10,5 +10,6 @@ class Settings(BaseSettings):
     ollama_model: str
     ollama_address: str
     ollama_timeout: str
+    a2a_address: str
 
 settings = Settings()

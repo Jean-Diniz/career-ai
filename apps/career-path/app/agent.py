@@ -11,7 +11,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
-from langgraph.graph.graph import CompiledGraph
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
 
 from app.models import PerfilPessoa
@@ -30,7 +30,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1")
 
 def create_career_agent(
     ollama_base_url: Optional[str] = None, ollama_model: Optional[str] = None
-) -> Optional[CompiledGraph]:
+) -> Optional[CompiledStateGraph]:
     """
     Cria um agente de carreira usando Ollama ou Google GenAI.
 
@@ -64,9 +64,9 @@ def create_career_agent(
         return None
 
 
-async def run_career_agent(agent: CompiledGraph, prompt: str) -> str:
+def run_career_agent_sync(agent: CompiledStateGraph, prompt: str) -> str:
     """
-    Executa o agente de carreira com um prompt.
+    Executa o agente de carreira com um prompt de forma síncrona.
 
     Args:
         agent: Agente configurado
@@ -76,11 +76,29 @@ async def run_career_agent(agent: CompiledGraph, prompt: str) -> str:
         Resposta do agente
     """
     try:
-        agent_response = await agent.ainvoke(
+        agent_response = agent.invoke(
             {"messages": [{"role": "user", "content": prompt}]}
         )
         message = agent_response["messages"][-1].content
         return str(message)
+    except Exception as e:
+        logger.error(f"Erro ao executar agente: {e}")
+        return f"Erro ao processar solicitação: {e}"
+
+async def run_career_agent(agent: CompiledStateGraph, prompt: str) -> str:
+    """
+    Executa o agente de carreira com um prompt de forma assíncrona.
+
+    Args:
+        agent: Agente configurado
+        prompt: Prompt de entrada
+
+    Returns:
+        Resposta do agente
+    """
+    try:
+        # Usar versão síncrona para evitar problemas com event loop
+        return run_career_agent_sync(agent, prompt)
     except Exception as e:
         logger.error(f"Erro ao executar agente: {e}")
         return f"Erro ao processar solicitação: {e}"
@@ -107,27 +125,27 @@ def get_llm_provider():
         )
 
 
-def criar_prompt_trilha(perfil: PerfilPessoa) -> str:
+def run_llm_sync(prompt: str) -> str:
+    """
+    Executa o LLM de forma síncrona para evitar problemas com event loop.
+    
+    Args:
+        prompt: Prompt de entrada
+        
+    Returns:
+        Resposta do LLM
+    """
+    try:
+        llm = get_llm_provider()
+        response = llm.invoke(prompt)
+        return response.content if hasattr(response, "content") else str(response)
+    except Exception as e:
+        logger.error(f"Erro ao executar LLM: {e}")
+        return f"Erro ao processar solicitação: {e}"
+
+
+def criar_prompt_trilha(perfil: str) -> str:
     """Cria o prompt personalizado para geração da trilha baseado no perfil."""
-
-    competencias_str = ""
-    for comp in perfil.competencias_atuais:
-        comp_details = f"- {comp.area} (Nível: {comp.nivel}"
-        if comp.experiencia_anos:
-            comp_details += f", {comp.experiencia_anos} anos"
-        if comp.detalhes:
-            comp_details += f", Detalhes: {comp.detalhes}"
-        comp_details += ")"
-        competencias_str += comp_details + "\n"
-
-    objetivos_str = ""
-    for obj in perfil.objetivos_carreira:
-        obj_details = f"- {obj.cargo_desejado} em {obj.area_interesse}"
-        if obj.prazo_anos:
-            obj_details += f" (Meta: {obj.prazo_anos} anos)"
-        if obj.motivacao:
-            obj_details += f" - Motivação: {obj.motivacao}"
-        objetivos_str += obj_details + "\n"
 
     prompt = f"""
 Você é um especialista em desenvolvimento de carreira e educação profissional. 
@@ -135,31 +153,8 @@ Sua tarefa é criar uma trilha de estudos personalizada e detalhada baseada \
 no perfil fornecido.
 
 **PERFIL DA PESSOA:**
-Nome: {perfil.nome}
-Idade: {perfil.idade if perfil.idade else "Não informado"}
-Escolaridade: {perfil.escolaridade}
-Área de Formação: {perfil.area_formacao if perfil.area_formacao else "Não informado"}
-
-**COMPETÊNCIAS ATUAIS:**
-{competencias_str}
-
-**OBJETIVOS DE CARREIRA:**
-{objetivos_str}
-
-**DISPONIBILIDADE E RECURSOS:**
-- Horas de estudo por semana: {
-        perfil.disponibilidade_estudo_horas_semana
-        if perfil.disponibilidade_estudo_horas_semana
-        else "Não informado"
-    }
-- Preferência de aprendizado: {
-        perfil.preferencia_aprendizado
-        if perfil.preferencia_aprendizado
-        else "Não informado"
-    }
-- Recursos disponíveis: {
-        perfil.recursos_disponiveis if perfil.recursos_disponiveis else "Não informado"
-    }
+{perfil}
+---
 
 **INSTRUÇÕES:**
 1. Analise o perfil completo identificando pontos fortes e lacunas
@@ -181,7 +176,7 @@ Formate a resposta como um JSON estruturado seguindo o modelo de TrilhaEstudos.
 
 
 async def gerar_trilha_ia(
-    perfil: PerfilPessoa, agent: Optional[CompiledGraph] = None
+    perfil: PerfilPessoa, agent: Optional[CompiledStateGraph] = None
 ) -> str:
     """
     Gera uma trilha de estudos usando IA baseada no perfil.
@@ -197,14 +192,10 @@ async def gerar_trilha_ia(
         prompt = criar_prompt_trilha(perfil)
 
         if agent:
-            response = await run_career_agent(agent, prompt)
+            response = run_career_agent_sync(agent, prompt)
         else:
             # Fallback para LLM direto
-            llm = get_llm_provider()
-            response = await llm.ainvoke(prompt)
-            response = (
-                response.content if hasattr(response, "content") else str(response)
-            )
+            response = run_llm_sync(prompt)
 
         return response
 
@@ -214,7 +205,7 @@ async def gerar_trilha_ia(
 
 
 async def analisar_perfil_ia(
-    perfil: PerfilPessoa, agent: Optional[CompiledGraph] = None
+    perfil: PerfilPessoa, agent: Optional[CompiledStateGraph] = None
 ) -> str:
     """
     Analisa um perfil profissional usando IA.
@@ -244,13 +235,9 @@ Seja específico e construtivo na análise.
 """
 
         if agent:
-            response = await run_career_agent(agent, prompt)
+            response = run_career_agent_sync(agent, prompt)
         else:
-            llm = get_llm_provider()
-            response = await llm.ainvoke(prompt)
-            response = (
-                response.content if hasattr(response, "content") else str(response)
-            )
+            response = run_llm_sync(prompt)
 
         return response
 
@@ -263,7 +250,7 @@ async def sugerir_recursos_ia(
     area: str,
     nivel: str = "intermediário",
     tipo: str = "todos",
-    agent: Optional[CompiledGraph] = None,
+    agent: Optional[CompiledStateGraph] = None,
 ) -> str:
     """
     Sugere recursos de estudo usando IA.
@@ -303,13 +290,9 @@ Priorize recursos atualizados e bem avaliados.
 """
 
         if agent:
-            response = await run_career_agent(agent, prompt)
+            response = run_career_agent_sync(agent, prompt)
         else:
-            llm = get_llm_provider()
-            response = await llm.ainvoke(prompt)
-            response = (
-                response.content if hasattr(response, "content") else str(response)
-            )
+            response = run_llm_sync(prompt)
 
         return response
 

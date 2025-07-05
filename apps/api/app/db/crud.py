@@ -6,7 +6,8 @@ from app.core.config import settings
 from app.db.models import User as UserTable
 from app.schemas.user import UserCreate, UserInDB
 from app.schemas.token import TokenData
-from app.db.models import Diagnostic as DiagnosticTable
+from app.db.models import Diagnostic as DiagnosticTable, StudyTrail as StudyTrailTable
+from app.schemas.study_trail import StudyTrailCreate, StudyTrail
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -22,16 +23,46 @@ def get_user(db: Session, username: str) -> UserInDB | None:
         return None
     return UserInDB(**db_user.__dict__)
 
-def create_diagnostic(db: Session, diagnostic: str, linkedin_url: str):
+def get_user_with_relationships(db: Session, username: str) -> UserTable | None:
+    """
+    Retorna o usuário com relacionamentos carregados (objeto SQLAlchemy).
+    Usado quando precisamos acessar diagnostics e study_trails.
+    """
+    return db.query(UserTable).filter(UserTable.username == username).first()
+
+def create_diagnostic(db: Session, diagnostic: str, linkedin_url: str, user_id: int = None):
     db_diagnostic = DiagnosticTable(
         diagnostic=diagnostic,
-        linkedin_url=linkedin_url
+        linkedin_url=linkedin_url,
+        user_id=user_id
     )
     db.add(db_diagnostic)
     db.commit()
     db.refresh(db_diagnostic)
 
-    return { diagnostic: diagnostic, linkedin_url: linkedin_url}
+    return { "diagnostic": diagnostic, "linkedin_url": linkedin_url, "user_id": user_id}
+
+def create_study_trail(db: Session, study_trail: StudyTrailCreate) -> StudyTrail:
+    db_study_trail = StudyTrailTable(
+        title=study_trail.title,
+        description=study_trail.description,
+        content=study_trail.content,
+        user_id=study_trail.user_id
+    )
+    db.add(db_study_trail)
+    db.commit()
+    db.refresh(db_study_trail)
+    return StudyTrail(**db_study_trail.__dict__)
+
+def get_study_trails_by_user(db: Session, user_id: int) -> list[StudyTrail]:
+    db_trails = db.query(StudyTrailTable).filter(StudyTrailTable.user_id == user_id).all()
+    return [StudyTrail(**trail.__dict__) for trail in db_trails]
+
+def get_study_trail(db: Session, trail_id: int) -> StudyTrail | None:
+    db_trail = db.query(StudyTrailTable).filter(StudyTrailTable.id == trail_id).first()
+    if not db_trail:
+        return None
+    return StudyTrail(**db_trail.__dict__)
 
 def create_user(db: Session, user_in: UserCreate) -> UserInDB:
     hashed = get_password_hash(user_in.password)

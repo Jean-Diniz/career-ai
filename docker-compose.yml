@@ -1,0 +1,78 @@
+services:
+  # API FastAPI
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:80"
+    depends_on:
+      career-path:
+        condition: service_started
+      ollama:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=sqlite:///./database.db
+      - SECRET_KEY=d07ff58a2b2787fcc420292ab4e931bddc3fa527591b086d2fb673f1a96f5175
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - OLLAMA_MODEL=gemma3:1b
+      - OLLAMA_ADDRESS=http://ollama:11434
+      - OLLAMA_TIMEOUT=120
+      - A2A_ADDRESS=http://career-path:5000
+    networks:
+      - career-network
+    volumes:
+      - ./apps/api:/app
+
+  # Agente Career Path
+  career-path:
+    build:
+      context: ./apps/career-path
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - DEFAULT_LLM_PROVIDER=google
+      - GOOGLE_API_KEY=AIzaSyAeK-sOSXrxUA_DPNFqENRlbMT04wCh7ck
+    networks:
+      - career-network
+
+  # Interface UI (Next.js)
+  # ui:
+  #   build:
+  #     context: ./apps/uidb
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_API_URL=http://localhost:8000
+  #   networks:
+  #     - career-network
+  #   depends_on:
+  #     - api
+
+  # Ollama para LLM
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - career-network
+    entrypoint: ["/bin/bash", "-c"]
+    command: ["ollama serve & sleep 10 && ollama pull gemma3:1b && touch /tmp/model_ready && tail -f /dev/null"]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "test -f /tmp/model_ready && ollama list | grep -q 'gemma3:1b'"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+
+networks:
+  career-network:
+    driver: bridge
+
+volumes:
+  ollama_data:

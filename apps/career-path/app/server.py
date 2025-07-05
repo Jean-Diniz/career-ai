@@ -189,8 +189,206 @@ class CareerAgent(A2AServer):
 
         return perfil_exemplo.model_dump_json(indent=2, ensure_ascii=False)
 
-    async def handle_message_async(self, message: Message) -> Message:
-        """Processa mensagens de forma assíncrona."""
+    def _processar_analise_perfil_sync(self, message: Message) -> Message:
+        """Processa solicitações de análise de perfil de forma síncrona."""
+        try:
+            # Extrai JSON do texto se presente
+            text = message.content.text
+            if "{" in text and "}" in text:
+                start = text.find("{")
+                end = text.rfind("}") + 1
+                perfil_json = text[start:end]
+
+                # Parse do JSON do perfil
+                perfil_dict = json.loads(perfil_json)
+                perfil = PerfilPessoa(**perfil_dict)
+
+                # Análise usando IA de forma síncrona
+                from app.agent import run_career_agent_sync, run_llm_sync
+                
+                if self.career_agent:
+                    prompt = f"""
+Analise o seguinte perfil profissional e forneça insights detalhados:
+
+{json.dumps(perfil.model_dump(), indent=2, ensure_ascii=False)}
+
+Forneça uma análise incluindo:
+1. Pontos fortes identificados
+2. Áreas de melhoria
+3. Oportunidades de crescimento
+4. Recomendações estratégicas
+5. Lacunas de competências para os objetivos
+6. Sugestões de próximos passos
+
+Seja específico e construtivo na análise.
+"""
+                    resultado = run_career_agent_sync(self.career_agent, prompt)
+                else:
+                    prompt = f"""
+Analise o seguinte perfil profissional e forneça insights detalhados:
+
+{json.dumps(perfil.model_dump(), indent=2, ensure_ascii=False)}
+
+Forneça uma análise incluindo:
+1. Pontos fortes identificados
+2. Áreas de melhoria
+3. Oportunidades de crescimento
+4. Recomendações estratégicas
+5. Lacunas de competências para os objetivos
+6. Sugestões de próximos passos
+
+Seja específico e construtivo na análise.
+"""
+                    resultado = run_llm_sync(prompt)
+
+                return Message(
+                    content=TextContent(
+                        text=f"📊 **Análise do Perfil:**\n\n{resultado}"
+                    ),
+                    role=MessageRole.AGENT,
+                    parent_message_id=message.message_id,
+                    conversation_id=message.conversation_id,
+                )
+            else:
+                return Message(
+                    content=TextContent(
+                        text="Para analisar um perfil, envie os dados no formato JSON. Use 'exemplo' para ver um template."
+                    ),
+                    role=MessageRole.AGENT,
+                    parent_message_id=message.message_id,
+                    conversation_id=message.conversation_id,
+                )
+
+        except Exception as e:
+            return Message(
+                content=TextContent(text=f"Erro ao processar análise: {str(e)}"),
+                role=MessageRole.AGENT,
+                parent_message_id=message.message_id,
+                conversation_id=message.conversation_id,
+            )
+
+    def _processar_trilha_estudos_sync(self, message: Message) -> Message:
+        """Processa solicitações de trilha de estudos de forma síncrona."""
+        try:
+            text = message.content.text
+            if "{" in text and "}" in text:
+
+                # Geração da trilha usando IA de forma síncrona
+                from app.agent import run_career_agent_sync, run_llm_sync, criar_prompt_trilha
+                
+                prompt = criar_prompt_trilha(text)
+                
+                if self.career_agent:
+                    resultado = run_career_agent_sync(self.career_agent, prompt)
+                else:
+                    resultado = run_llm_sync(prompt)
+
+                return Message(
+                    content=TextContent(
+                        text=f"🛤️ **Trilha de Estudos:**\n\n{resultado}"
+                    ),
+                    role=MessageRole.AGENT,
+                    parent_message_id=message.message_id,
+                    conversation_id=message.conversation_id,
+                )
+            else:
+                return Message(
+                    content=TextContent(
+                        text="Para gerar uma trilha de estudos, envie os dados do perfil no formato JSON. Use 'exemplo' para ver um template."
+                    ),
+                    role=MessageRole.AGENT,
+                    parent_message_id=message.message_id,
+                    conversation_id=message.conversation_id,
+                )
+
+        except Exception as e:
+            return Message(
+                content=TextContent(text=f"Erro ao processar trilha: {str(e)}"),
+                role=MessageRole.AGENT,
+                parent_message_id=message.message_id,
+                conversation_id=message.conversation_id,
+            )
+
+    def _processar_sugestao_recursos_sync(self, message: Message) -> Message:
+        """Processa solicitações de sugestão de recursos de forma síncrona."""
+        try:
+            text = message.content.text
+
+            # Extrai parâmetros do texto
+            area = "tecnologia"  # padrão
+            nivel = "intermediário"  # padrão
+            tipo = "todos"  # padrão
+
+            # Parse simples de parâmetros
+            if "área:" in text or "area:" in text:
+                area_match = text.split("área:" if "área:" in text else "area:")[
+                    1
+                ].split()[0]
+                area = area_match.strip(",.")
+
+            if "nível:" in text or "nivel:" in text:
+                nivel_match = text.split("nível:" if "nível:" in text else "nivel:")[
+                    1
+                ].split()[0]
+                nivel = nivel_match.strip(",.")
+
+            if "tipo:" in text:
+                tipo_match = text.split("tipo:")[1].split()[0]
+                tipo = tipo_match.strip(",.")
+
+            # Gera sugestões usando IA de forma síncrona
+            from app.agent import run_career_agent_sync, run_llm_sync
+            
+            prompt = f"""
+Sugira recursos de estudo específicos para:
+- Área: {area}
+- Nível: {nivel}
+- Tipo de recurso: {tipo}
+
+Inclua:
+1. Cursos online recomendados (com plataformas)
+2. Livros essenciais
+3. Certificações relevantes
+4. Projetos práticos sugeridos
+5. Comunidades e eventos
+6. Ferramentas e tecnologias
+
+Para cada recurso, forneça:
+- Nome/título
+- Descrição breve
+- Duração/esforço estimado
+- Custo aproximado
+- Link ou onde encontrar (quando possível)
+
+Priorize recursos atualizados e bem avaliados.
+"""
+            
+            if self.career_agent:
+                resultado = run_career_agent_sync(self.career_agent, prompt)
+            else:
+                resultado = run_llm_sync(prompt)
+
+            return Message(
+                content=TextContent(
+                    text=f"📚 **Recursos para {area} (nível {nivel}):**\n\n{resultado}"
+                ),
+                role=MessageRole.AGENT,
+                parent_message_id=message.message_id,
+                conversation_id=message.conversation_id,
+            )
+
+        except Exception as e:
+            return Message(
+                content=TextContent(text=f"Erro ao sugerir recursos: {str(e)}"),
+                role=MessageRole.AGENT,
+                parent_message_id=message.message_id,
+                conversation_id=message.conversation_id,
+            )
+
+
+
+    def handle_message(self, message: Message) -> Message:
+        """Processa mensagens de forma síncrona."""
         try:
             if message.content.type != "text":
                 return Message(
@@ -206,18 +404,18 @@ class CareerAgent(A2AServer):
 
             # Análise de intenção baseada em palavras-chave
             if any(palavra in text for palavra in ["analisar", "análise", "perfil"]):
-                return await self._processar_analise_perfil(message)
+                return self._processar_analise_perfil_sync(message)
 
             elif any(
                 palavra in text for palavra in ["trilha", "estudos", "plano", "roadmap"]
             ):
-                return await self._processar_trilha_estudos(message)
+                return self._processar_trilha_estudos_sync(message)
 
             elif any(
                 palavra in text
                 for palavra in ["recursos", "cursos", "certificação", "sugerir"]
             ):
-                return await self._processar_sugestao_recursos(message)
+                return self._processar_sugestao_recursos_sync(message)
 
             elif any(palavra in text for palavra in ["exemplo", "template", "demo"]):
                 exemplo = self.criar_perfil_exemplo()
@@ -245,129 +443,7 @@ class CareerAgent(A2AServer):
                 conversation_id=message.conversation_id,
             )
 
-    def handle_message(self, message: Message) -> Message:
-        """Wrapper síncrono para o processador assíncrono."""
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(self.handle_message_async(message))
 
-    async def _processar_analise_perfil(self, message: Message) -> Message:
-        """Processa solicitações de análise de perfil."""
-        try:
-            # Extrai JSON do texto se presente
-            text = message.content.text
-            if "{" in text and "}" in text:
-                start = text.find("{")
-                end = text.rfind("}") + 1
-                perfil_json = text[start:end]
-
-                resultado = await self.analisar_perfil(perfil_json)
-                return Message(
-                    content=TextContent(
-                        text=f"📊 **Análise do Perfil:**\n\n{resultado}"
-                    ),
-                    role=MessageRole.AGENT,
-                    parent_message_id=message.message_id,
-                    conversation_id=message.conversation_id,
-                )
-            else:
-                return Message(
-                    content=TextContent(
-                        text="Para analisar um perfil, envie os dados no formato JSON. Use 'exemplo' para ver um template."
-                    ),
-                    role=MessageRole.AGENT,
-                    parent_message_id=message.message_id,
-                    conversation_id=message.conversation_id,
-                )
-
-        except Exception as e:
-            return Message(
-                content=TextContent(text=f"Erro ao processar análise: {str(e)}"),
-                role=MessageRole.AGENT,
-                parent_message_id=message.message_id,
-                conversation_id=message.conversation_id,
-            )
-
-    async def _processar_trilha_estudos(self, message: Message) -> Message:
-        """Processa solicitações de trilha de estudos."""
-        try:
-            # Extrai JSON do texto se presente
-            text = message.content.text
-            if "{" in text and "}" in text:
-                start = text.find("{")
-                end = text.rfind("}") + 1
-                perfil_json = text[start:end]
-
-                resultado = await self.gerar_trilha(perfil_json)
-                return Message(
-                    content=TextContent(
-                        text=f"🛤️ **Trilha de Estudos:**\n\n{resultado}"
-                    ),
-                    role=MessageRole.AGENT,
-                    parent_message_id=message.message_id,
-                    conversation_id=message.conversation_id,
-                )
-            else:
-                return Message(
-                    content=TextContent(
-                        text="Para gerar uma trilha de estudos, envie os dados do perfil no formato JSON. Use 'exemplo' para ver um template."
-                    ),
-                    role=MessageRole.AGENT,
-                    parent_message_id=message.message_id,
-                    conversation_id=message.conversation_id,
-                )
-
-        except Exception as e:
-            return Message(
-                content=TextContent(text=f"Erro ao processar trilha: {str(e)}"),
-                role=MessageRole.AGENT,
-                parent_message_id=message.message_id,
-                conversation_id=message.conversation_id,
-            )
-
-    async def _processar_sugestao_recursos(self, message: Message) -> Message:
-        """Processa solicitações de sugestão de recursos."""
-        try:
-            text = message.content.text
-
-            # Extrai parâmetros do texto
-            area = "tecnologia"  # padrão
-            nivel = "intermediário"  # padrão
-            tipo = "todos"  # padrão
-
-            # Parse simples de parâmetros
-            if "área:" in text or "area:" in text:
-                area_match = text.split("área:" if "área:" in text else "area:")[
-                    1
-                ].split()[0]
-                area = area_match.strip(",.")
-
-            if "nível:" in text or "nivel:" in text:
-                nivel_match = text.split("nível:" if "nível:" in text else "nivel:")[
-                    1
-                ].split()[0]
-                nivel = nivel_match.strip(",.")
-
-            if "tipo:" in text:
-                tipo_match = text.split("tipo:")[1].split()[0]
-                tipo = tipo_match.strip(",.")
-
-            resultado = await self.sugerir_recursos(area, nivel, tipo)
-            return Message(
-                content=TextContent(
-                    text=f"📚 **Recursos para {area} (nível {nivel}):**\n\n{resultado}"
-                ),
-                role=MessageRole.AGENT,
-                parent_message_id=message.message_id,
-                conversation_id=message.conversation_id,
-            )
-
-        except Exception as e:
-            return Message(
-                content=TextContent(text=f"Erro ao sugerir recursos: {str(e)}"),
-                role=MessageRole.AGENT,
-                parent_message_id=message.message_id,
-                conversation_id=message.conversation_id,
-            )
 
     def _gerar_ajuda(self, message: Message) -> Message:
         """Gera mensagem de ajuda."""
