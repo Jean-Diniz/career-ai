@@ -15,8 +15,8 @@ class User(Base):
     linkedin_url = Column(String, nullable=False)
     
     # Relacionamentos
-    diagnostics = relationship("Diagnostic", back_populates="user")
-    study_trails = relationship("StudyTrail", back_populates="user")
+    diagnostics = relationship("Diagnostic", back_populates="user", lazy="joined")
+    study_trails = relationship("StudyTrail", back_populates="user", lazy="joined")
 
 class Diagnostic(Base):
     __tablename__ = "diagnostics"

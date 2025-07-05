@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug com -m app.server",
+      "type": "python",
+      "request": "launch",
+      "module": "app.server",
+      "cwd": "${workspaceFolder}/app",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "console": "integratedTerminal"
+    }
+  ]
+}

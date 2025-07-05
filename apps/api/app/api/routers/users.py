@@ -1,16 +1,22 @@
 from fastapi import APIRouter, Depends, status, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from app.schemas.user import User, UserCreate
+from app.schemas.user import User, UserCreate, UserWithRelationships
 from app.db.crud import get_user, create_user, create_diagnostic, create_study_trail, get_study_trails_by_user
-from app.api.deps import get_db, get_current_active_user
+from app.api.deps import get_db, get_current_active_user, get_current_active_user_with_relationships
 from app.db.models import User as UserTable
 from app.schemas.study_trail import StudyTrailCreate, StudyTrail
 import httpx 
 import json
+from datetime import datetime, timezone
 from app.core.config import settings
-from python_a2a import A2AClient
+from python_a2a import A2AClient, ContentType, MessageRole, TextContent, Message
+from pydantic import BaseModel
 
 router = APIRouter()
+
+class StudyTrailRequest(BaseModel):
+    user_id: int
+    linkedin_analysis: str
 
 def enqueue_ollama_analysis(db: Session, linkedin_url: str, user_id: int) -> None:
     prompt = """"
@@ -62,7 +68,7 @@ def enqueue_ollama_analysis(db: Session, linkedin_url: str, user_id: int) -> Non
     payload = {
         "model": settings.ollama_model,
         "prompt": prompt,
-        "parameters": {"max_tokens": 128, "temperature": 0.7},
+        "parameters": {"max_tokens": 1000, "temperature": 0.7},
         "stream": False
     }
 
@@ -75,113 +81,54 @@ def enqueue_ollama_analysis(db: Session, linkedin_url: str, user_id: int) -> Non
         )
         
         # Salvar diagnóstico vinculado ao usuário
-        create_diagnostic(db, resp.json()["response"], linkedin_url, user_id)
-        
-        # Após o diagnóstico, chamar o agente career-path
-        enqueue_career_path_analysis(db, resp.json()["response"], user_id)
-
+        linkedin_analysis = resp.json()["response"]
+        create_diagnostic(db, linkedin_analysis, linkedin_url, user_id)
+                
         resp.raise_for_status()
     except Exception as e:
         print(f"[Background] erro ao chamar Ollama: {e}")
 
 def enqueue_career_path_analysis(db: Session, linkedin_analysis: str, user_id: int) -> None:
     """
-    Chama o agente career-path para gerar uma trilha de estudos baseada na análise do LinkedIn.
+    Função para executar análise de carreira em background.
+    Usa a mesma abordagem que funciona no test_integration_a2a.py.
     """
     try:
-        # Converter análise do LinkedIn para formato do PerfilPessoa
-        profile_data = convert_linkedin_to_profile(linkedin_analysis)
-        
-        # Conectar ao agente career-path
-        client = A2AClient(base_url="http://career-path:5000")
-        
-        # Chamar o skill de gerar trilha
-        response = client.call_skill(
-            "Gerar Trilha de Estudos",
-            profile_data
-        )
-        
-        # Salvar trilha no banco
-        study_trail = StudyTrailCreate(
-            title="Trilha de Estudos Personalizada",
-            description="Trilha gerada automaticamente baseada na análise do LinkedIn",
-            content=response,
-            user_id=user_id
-        )
-        
-        create_study_trail(db, study_trail)
-        
-        print(f"[Background] Trilha de estudos criada para usuário {user_id}")
-        
-    except Exception as e:
-        print(f"[Background] erro ao chamar agente career-path: {e}")
+        import asyncio
 
-def convert_linkedin_to_profile(linkedin_analysis: str) -> str:
-    """
-    Converte a análise do LinkedIn para o formato PerfilPessoa esperado pelo agente.
-    """
-    try:
-        # Parse da análise do LinkedIn
-        analysis_data = json.loads(linkedin_analysis)
-        
-        # Criar perfil baseado na análise
-        profile = {
-            "nome": analysis_data.get("name", "Nome não informado"),
-            "escolaridade": "Superior",  # Padrão, pode ser ajustado
-            "area_formacao": analysis_data.get("industry", "Não informado"),
-            "competencias_atuais": [
-                {
-                    "area": skill["skill"],
-                    "nivel": "intermediário",
-                    "experiencia_anos": 2,
-                    "detalhes": f"Endorsements: {skill['endorsements']}"
-                }
-                for skill in analysis_data.get("top_skills", [])[:3]
-            ],
-            "objetivos_carreira": [
-                {
-                    "cargo_desejado": "Desenvolvedor Sênior",
-                    "area_interesse": analysis_data.get("industry", "Tecnologia"),
-                    "prazo_anos": 2,
-                    "motivacao": "Crescimento profissional baseado na análise do LinkedIn"
-                }
-            ],
-            "disponibilidade_estudo_horas_semana": 10,
-            "preferencia_aprendizado": "online",
-            "recursos_disponiveis": "cursos online, livros, certificações"
-        }
-        
-        return json.dumps(profile, ensure_ascii=False, indent=2)
-        
+        # Executar a comunicação A2A
+        async def _executar_analise():
+            client = A2AClient(settings.a2a_address)
+
+            message_obj = Message(
+                content=TextContent(text="Gere uma trilha de estudos: " + linkedin_analysis),
+                role=MessageRole.USER
+            )
+
+            response = await client.send_message_async(message_obj)
+
+            study_trail = StudyTrailCreate(
+                title="Trilha de Estudos Personalizada",
+                description="Trilha gerada automaticamente baseada na análise do LinkedIn",
+                content=response.content.text,
+                user_id=user_id
+            )
+
+            create_study_trail(db, study_trail)
+            return True
+            
+        # Criar novo event loop (igual ao test_integration_a2a.py)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            resultado = loop.run_until_complete(_executar_analise())
+            print(f"[Background] Trilha de estudos criada com sucesso para usuário {user_id}")
+        finally:
+            loop.close()
+            
     except Exception as e:
-        print(f"Erro ao converter análise do LinkedIn: {e}")
-        # Retornar perfil padrão em caso de erro
-        default_profile = {
-            "nome": "Usuário",
-            "escolaridade": "Superior",
-            "area_formacao": "Tecnologia",
-            "competencias_atuais": [
-                {
-                    "area": "Desenvolvimento",
-                    "nivel": "intermediário",
-                    "experiencia_anos": 2,
-                    "detalhes": "Baseado na análise do LinkedIn"
-                }
-            ],
-            "objetivos_carreira": [
-                {
-                    "cargo_desejado": "Desenvolvedor Sênior",
-                    "area_interesse": "Tecnologia",
-                    "prazo_anos": 2,
-                    "motivacao": "Crescimento profissional"
-                }
-            ],
-            "disponibilidade_estudo_horas_semana": 10,
-            "preferencia_aprendizado": "online",
-            "recursos_disponiveis": "cursos online, livros"
-        }
-        
-        return json.dumps(default_profile, ensure_ascii=False, indent=2)
+        print(f"[Background] erro ao disparar agente career-path: {e}")
+        # Não fazer raise aqui pois é background task
 
 @router.post(
     "/users/", response_model=User, status_code=status.HTTP_201_CREATED
@@ -220,6 +167,15 @@ async def read_users_me(current_user = Depends(get_current_active_user)):
     return current_user
 
 @router.get(
+    "/users/me/full/", response_model=UserWithRelationships
+)
+async def read_users_me_full(current_user: UserTable = Depends(get_current_active_user_with_relationships)):
+    """
+    Retorna o usuário atual com todos os relacionamentos (diagnósticos e trilhas de estudo).
+    """
+    return current_user
+
+@router.get(
     "/users/me/study-trails/", response_model=list[StudyTrail]
 )
 async def get_my_study_trails(
@@ -230,3 +186,35 @@ async def get_my_study_trails(
     Retorna todas as trilhas de estudos do usuário logado.
     """
     return get_study_trails_by_user(db, current_user.id)
+
+@router.post(
+    "/users/me/study-trails/"
+)
+async def create_study_trail_endpoint(
+    background_tasks: BackgroundTasks,
+    current_user: UserTable = Depends(get_current_active_user_with_relationships),
+    db: Session = Depends(get_db)
+):
+    """
+    Cria uma nova trilha de estudos baseada no diagnóstico mais recente do usuário.
+    """
+    # Verificar se o usuário tem diagnósticos
+    if not current_user.diagnostics:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Usuário não possui diagnósticos. Faça o cadastro primeiro."
+        )
+    
+    # Pegar o diagnóstico mais recente
+    latest_diagnostic = current_user.diagnostics[-1]
+    
+    # Chamar a função como background task
+    background_tasks.add_task(
+        enqueue_career_path_analysis,
+        db,
+        latest_diagnostic.diagnostic,
+        current_user.id
+    )
+    
+    return {"status": "success", "message": "Trilha de estudos sendo criada em background"}
+    

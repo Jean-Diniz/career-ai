@@ -23,6 +23,13 @@ def get_user(db: Session, username: str) -> UserInDB | None:
         return None
     return UserInDB(**db_user.__dict__)
 
+def get_user_with_relationships(db: Session, username: str) -> UserTable | None:
+    """
+    Retorna o usuário com relacionamentos carregados (objeto SQLAlchemy).
+    Usado quando precisamos acessar diagnostics e study_trails.
+    """
+    return db.query(UserTable).filter(UserTable.username == username).first()
+
 def create_diagnostic(db: Session, diagnostic: str, linkedin_url: str, user_id: int = None):
     db_diagnostic = DiagnosticTable(
         diagnostic=diagnostic,
