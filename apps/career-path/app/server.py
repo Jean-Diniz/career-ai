@@ -22,8 +22,11 @@ from app.agent import (
     create_career_agent,
     gerar_trilha_ia,
     sugerir_recursos_ia,
+    run_career_agent_sync,
+    run_llm_sync,
 )
 from app.models import Competencia, ObjetivoCarreira, PerfilPessoa
+from prompts import CareerPrompts
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -70,15 +73,10 @@ class CareerAgent(A2AServer):
             Análise detalhada do perfil
         """
         try:
-            # Parse do JSON do perfil
             perfil_dict = json.loads(perfil_data)
             perfil = PerfilPessoa(**perfil_dict)
-
-            # Análise usando IA
             resultado = await analisar_perfil_ia(perfil, self.career_agent)
-
             return resultado
-
         except json.JSONDecodeError:
             return "Erro: Formato JSON inválido para o perfil."
         except Exception as e:
@@ -101,15 +99,10 @@ class CareerAgent(A2AServer):
             Trilha de estudos estruturada
         """
         try:
-            # Parse do JSON do perfil
             perfil_dict = json.loads(perfil_data)
             perfil = PerfilPessoa(**perfil_dict)
-
-            # Geração da trilha usando IA
             trilha = await gerar_trilha_ia(perfil, self.career_agent)
-
             return trilha
-
         except json.JSONDecodeError:
             return "Erro: Formato JSON inválido para o perfil."
         except Exception as e:
@@ -138,7 +131,6 @@ class CareerAgent(A2AServer):
         try:
             recursos = await sugerir_recursos_ia(area, nivel, tipo, self.career_agent)
             return recursos
-
         except Exception as e:
             logger.error(f"Erro ao sugerir recursos: {e}")
             return f"Erro ao sugerir recursos: {str(e)}"
@@ -186,59 +178,24 @@ class CareerAgent(A2AServer):
             preferencia_aprendizado="online",
             recursos_disponiveis="cursos online, livros",
         )
-
         return perfil_exemplo.model_dump_json(indent=2, ensure_ascii=False)
 
     def _processar_analise_perfil_sync(self, message: Message) -> Message:
         """Processa solicitações de análise de perfil de forma síncrona."""
         try:
-            # Extrai JSON do texto se presente
             text = message.content.text
             if "{" in text and "}" in text:
                 start = text.find("{")
                 end = text.rfind("}") + 1
                 perfil_json = text[start:end]
-
-                # Parse do JSON do perfil
                 perfil_dict = json.loads(perfil_json)
                 perfil = PerfilPessoa(**perfil_dict)
 
-                # Análise usando IA de forma síncrona
-                from app.agent import run_career_agent_sync, run_llm_sync
-                
+                prompt = CareerPrompts.profile_analysis_prompt(perfil.model_dump())
+
                 if self.career_agent:
-                    prompt = f"""
-Analise o seguinte perfil profissional e forneça insights detalhados:
-
-{json.dumps(perfil.model_dump(), indent=2, ensure_ascii=False)}
-
-Forneça uma análise incluindo:
-1. Pontos fortes identificados
-2. Áreas de melhoria
-3. Oportunidades de crescimento
-4. Recomendações estratégicas
-5. Lacunas de competências para os objetivos
-6. Sugestões de próximos passos
-
-Seja específico e construtivo na análise.
-"""
                     resultado = run_career_agent_sync(self.career_agent, prompt)
                 else:
-                    prompt = f"""
-Analise o seguinte perfil profissional e forneça insights detalhados:
-
-{json.dumps(perfil.model_dump(), indent=2, ensure_ascii=False)}
-
-Forneça uma análise incluindo:
-1. Pontos fortes identificados
-2. Áreas de melhoria
-3. Oportunidades de crescimento
-4. Recomendações estratégicas
-5. Lacunas de competências para os objetivos
-6. Sugestões de próximos passos
-
-Seja específico e construtivo na análise.
-"""
                     resultado = run_llm_sync(prompt)
 
                 return Message(
@@ -258,7 +215,6 @@ Seja específico e construtivo na análise.
                     parent_message_id=message.message_id,
                     conversation_id=message.conversation_id,
                 )
-
         except Exception as e:
             return Message(
                 content=TextContent(text=f"Erro ao processar análise: {str(e)}"),
@@ -272,12 +228,14 @@ Seja específico e construtivo na análise.
         try:
             text = message.content.text
             if "{" in text and "}" in text:
+                start = text.find("{")
+                end = text.rfind("}") + 1
+                perfil_json = text[start:end]
+                perfil_dict = json.loads(perfil_json)
+                perfil = PerfilPessoa(**perfil_dict)
 
-                # Geração da trilha usando IA de forma síncrona
-                from app.agent import run_career_agent_sync, run_llm_sync, criar_prompt_trilha
-                
-                prompt = criar_prompt_trilha(text)
-                
+                prompt = CareerPrompts.study_trail_prompt(perfil.model_dump())
+
                 if self.career_agent:
                     resultado = run_career_agent_sync(self.career_agent, prompt)
                 else:
@@ -300,7 +258,6 @@ Seja específico e construtivo na análise.
                     parent_message_id=message.message_id,
                     conversation_id=message.conversation_id,
                 )
-
         except Exception as e:
             return Message(
                 content=TextContent(text=f"Erro ao processar trilha: {str(e)}"),
@@ -313,56 +270,17 @@ Seja específico e construtivo na análise.
         """Processa solicitações de sugestão de recursos de forma síncrona."""
         try:
             text = message.content.text
+            area, nivel, tipo = "tecnologia", "intermediário", "todos"
 
-            # Extrai parâmetros do texto
-            area = "tecnologia"  # padrão
-            nivel = "intermediário"  # padrão
-            tipo = "todos"  # padrão
-
-            # Parse simples de parâmetros
             if "área:" in text or "area:" in text:
-                area_match = text.split("área:" if "área:" in text else "area:")[
-                    1
-                ].split()[0]
-                area = area_match.strip(",.")
-
+                area = text.split("área:" if "área:" in text else "area:")[1].split()[0].strip(",.")
             if "nível:" in text or "nivel:" in text:
-                nivel_match = text.split("nível:" if "nível:" in text else "nivel:")[
-                    1
-                ].split()[0]
-                nivel = nivel_match.strip(",.")
-
+                nivel = text.split("nível:" if "nível:" in text else "nivel:")[1].split()[0].strip(",.")
             if "tipo:" in text:
-                tipo_match = text.split("tipo:")[1].split()[0]
-                tipo = tipo_match.strip(",.")
+                tipo = text.split("tipo:")[1].split()[0].strip(",.")
 
-            # Gera sugestões usando IA de forma síncrona
-            from app.agent import run_career_agent_sync, run_llm_sync
-            
-            prompt = f"""
-Sugira recursos de estudo específicos para:
-- Área: {area}
-- Nível: {nivel}
-- Tipo de recurso: {tipo}
+            prompt = CareerPrompts.resource_suggestion_prompt(area, nivel, tipo)
 
-Inclua:
-1. Cursos online recomendados (com plataformas)
-2. Livros essenciais
-3. Certificações relevantes
-4. Projetos práticos sugeridos
-5. Comunidades e eventos
-6. Ferramentas e tecnologias
-
-Para cada recurso, forneça:
-- Nome/título
-- Descrição breve
-- Duração/esforço estimado
-- Custo aproximado
-- Link ou onde encontrar (quando possível)
-
-Priorize recursos atualizados e bem avaliados.
-"""
-            
             if self.career_agent:
                 resultado = run_career_agent_sync(self.career_agent, prompt)
             else:
@@ -376,7 +294,6 @@ Priorize recursos atualizados e bem avaliados.
                 parent_message_id=message.message_id,
                 conversation_id=message.conversation_id,
             )
-
         except Exception as e:
             return Message(
                 content=TextContent(text=f"Erro ao sugerir recursos: {str(e)}"),
@@ -385,16 +302,12 @@ Priorize recursos atualizados e bem avaliados.
                 conversation_id=message.conversation_id,
             )
 
-
-
     def handle_message(self, message: Message) -> Message:
         """Processa mensagens de forma síncrona."""
         try:
             if message.content.type != "text":
                 return Message(
-                    content=TextContent(
-                        text="Apenas mensagens de texto são suportadas."
-                    ),
+                    content=TextContent(text="Apenas mensagens de texto são suportadas."),
                     role=MessageRole.AGENT,
                     parent_message_id=message.message_id,
                     conversation_id=message.conversation_id,
@@ -402,38 +315,24 @@ Priorize recursos atualizados e bem avaliados.
 
             text = message.content.text.lower()
 
-            # Análise de intenção baseada em palavras-chave
             if any(palavra in text for palavra in ["analisar", "análise", "perfil"]):
                 return self._processar_analise_perfil_sync(message)
-
-            elif any(
-                palavra in text for palavra in ["trilha", "estudos", "plano", "roadmap"]
-            ):
+            elif any(palavra in text for palavra in ["trilha", "estudos", "plano", "roadmap"]):
                 return self._processar_trilha_estudos_sync(message)
-
-            elif any(
-                palavra in text
-                for palavra in ["recursos", "cursos", "certificação", "sugerir"]
-            ):
+            elif any(palavra in text for palavra in ["recursos", "cursos", "certificação", "sugerir"]):
                 return self._processar_sugestao_recursos_sync(message)
-
             elif any(palavra in text for palavra in ["exemplo", "template", "demo"]):
                 exemplo = self.criar_perfil_exemplo()
                 return Message(
-                    content=TextContent(
-                        text=f"Aqui está um exemplo de perfil:\n\n```json\n{exemplo}\n```"
-                    ),
+                    content=TextContent(text=f"Aqui está um exemplo de perfil:\n\n```json\n{exemplo}\n```"),
                     role=MessageRole.AGENT,
                     parent_message_id=message.message_id,
                     conversation_id=message.conversation_id,
                 )
-
             elif any(palavra in text for palavra in ["ajuda", "help", "comandos"]):
                 return self._gerar_ajuda(message)
-
             else:
                 return self._gerar_resposta_padrao(message)
-
         except Exception as e:
             logger.error(f"Erro ao processar mensagem: {e}")
             return Message(
@@ -442,8 +341,6 @@ Priorize recursos atualizados e bem avaliados.
                 parent_message_id=message.message_id,
                 conversation_id=message.conversation_id,
             )
-
-
 
     def _gerar_ajuda(self, message: Message) -> Message:
         """Gera mensagem de ajuda."""
@@ -455,7 +352,7 @@ Priorize recursos atualizados e bem avaliados.
 - Receba insights sobre pontos fortes, áreas de melhoria e recomendações
 
 **🛤️ Trilha de Estudos:**
-- Digite "trilha de estudos" + dados JSON  
+- Digite "trilha de estudos" + dados JSON
 - Receba um plano personalizado de desenvolvimento
 
 **📚 Sugestão de Recursos:**
@@ -472,7 +369,6 @@ Priorize recursos atualizados e bem avaliados.
 
 Digite 'exemplo' para começar!
 """
-
         return Message(
             content=TextContent(text=ajuda),
             role=MessageRole.AGENT,
@@ -487,7 +383,7 @@ Digite 'exemplo' para começar!
 
 Posso ajudar você com:
 - 📊 Análise de perfil profissional
-- 🛤️ Criação de trilhas de estudos personalizadas  
+- 🛤️ Criação de trilhas de estudos personalizadas
 - 📚 Sugestão de recursos educacionais
 - 💡 Orientação de carreira
 
@@ -495,7 +391,6 @@ Digite 'ajuda' para ver todos os comandos disponíveis ou 'exemplo' para ver um 
 
 Como posso ajudar você hoje?
 """
-
         return Message(
             content=TextContent(text=resposta),
             role=MessageRole.AGENT,
@@ -505,7 +400,6 @@ Como posso ajudar você hoje?
 
 
 if __name__ == "__main__":
-    # Cria e executa o agente de carreira
     career_agent = CareerAgent()
     logger.info("Iniciando Agente de Carreira AI em http://0.0.0.0:5000")
     run_server(career_agent, host="0.0.0.0", port=5000)
